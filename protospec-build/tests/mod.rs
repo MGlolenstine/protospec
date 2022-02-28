@@ -7,12 +7,12 @@ use protospec_build::{*, ffi::ForeignType};
 use quote::quote;
 
 pub fn load_asg(content: &str) -> AsgResult<asg::Program> {
-    load_asg_with(content, TestImportResolver)
+    load_asg_with(content, Box::new(TestImportResolver))
 }
 
-pub fn load_asg_with<T: ImportResolver + 'static>(
+pub fn load_asg_with(
     content: &str,
-    resolver: T,
+    resolver: Box<dyn ImportResolver>,
 ) -> AsgResult<asg::Program> {
     let resolver = PreludeImportResolver(resolver);
     asg::Program::from_ast(
@@ -151,6 +151,10 @@ impl ForeignType for TestType {
 pub struct TestImportResolver;
 
 impl ImportResolver for TestImportResolver {
+    fn clone(&self) -> Box<dyn ImportResolver>{
+        Box::new(TestImportResolver)
+    }
+
     fn normalize_import(&self, import: &str) -> Result<String> {
         Ok(import.to_string())
     }
@@ -181,6 +185,10 @@ impl ImportResolver for TestImportResolver {
 pub struct MockImportResolver(IndexMap<String, String>);
 
 impl ImportResolver for MockImportResolver {
+    fn clone(&self) -> Box<dyn ImportResolver>{
+        Box::new(MockImportResolver(self.0.clone()))
+    }
+
     fn normalize_import(&self, import: &str) -> Result<String> {
         Ok(import.to_string())
     }

@@ -35,7 +35,7 @@ fn test_import_missing() {
 
     type test_impl = test_missing;
     "#,
-        mocked_import,
+        Box::new(mocked_import),
     )
     .err()
     .unwrap();
@@ -51,7 +51,7 @@ fn test_import_file_missing() {
 
     type test_impl = test_container;
     "#,
-        mocked_import,
+        Box::new(mocked_import),
     )
     .err()
     .unwrap();
@@ -67,7 +67,7 @@ fn test_import_file_corrupt() {
 
     type test_impl = test_container;
     "#,
-        mocked_import,
+        Box::new(mocked_import),
     )
     .err()
     .unwrap();

@@ -33,7 +33,7 @@ fn test_import() {
 
     type test_impl = test_container;
     "#,
-        mocked_import,
+        Box::new(mocked_import),
     )
     .unwrap();
 }
@@ -52,7 +52,7 @@ fn test_import_ffi() {
         extra: test_type,
     };
     "#,
-        mocked_import,
+        Box::new(mocked_import),
     )
     .unwrap();
 }
@@ -69,7 +69,7 @@ fn test_import_ffi_implicit() {
         testy: test_container,
     };
     "#,
-        mocked_import,
+        Box::new(mocked_import),
     )
     .unwrap();
 }

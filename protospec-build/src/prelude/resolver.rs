@@ -1,7 +1,11 @@
 use super::*;
-pub struct PreludeImportResolver<T: ImportResolver + 'static>(pub T);
+pub struct PreludeImportResolver(pub Box<dyn ImportResolver>);
 
-impl<T: ImportResolver + 'static> ImportResolver for PreludeImportResolver<T> {
+impl ImportResolver for PreludeImportResolver {
+    fn clone(&self) -> Box<dyn ImportResolver>{
+        Box::new(PreludeImportResolver(self.0.clone()))
+    }
+
     fn normalize_import(&self, import: &str) -> Result<String> {
         self.0.normalize_import(import)
     }

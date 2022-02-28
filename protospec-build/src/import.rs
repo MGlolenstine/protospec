@@ -1,6 +1,8 @@
 use crate::{result::*, ForeignFunctionObj, ForeignTransformObj, ForeignTypeObj};
 
 pub trait ImportResolver {
+    fn clone(&self) -> Box<dyn ImportResolver>;
+
     fn normalize_import(&self, import: &str) -> Result<String>;
 
     fn resolve_import(&self, import: &str) -> Result<Option<String>>;
@@ -15,6 +17,10 @@ pub trait ImportResolver {
 pub struct NullImportResolver;
 
 impl ImportResolver for NullImportResolver {
+    fn clone(&self) -> Box<dyn ImportResolver> {
+        Box::new(NullImportResolver{})
+    }
+
     fn normalize_import(&self, import: &str) -> Result<String> {
         Ok(import.to_string())
     }

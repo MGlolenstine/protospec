@@ -40,18 +40,17 @@ pub use prelude::*;
 pub mod ffi;
 pub use ffi::*;
 
-#[derive(Clone)]
-pub struct Options<T: ImportResolver + 'static> {
+pub struct Options {
     pub format_output: bool,
     pub enum_derives: Vec<String>,
     pub struct_derives: Vec<String>,
     pub include_async: bool,
     pub use_anyhow: bool,
     pub debug_mode: bool,
-    pub resolver: T
+    pub resolver: Box<dyn ImportResolver>,
 }
 
-impl Default for Options<NullImportResolver> {
+impl Default for Options {
     fn default() -> Self {
         Options {
             format_output: true,
@@ -72,7 +71,7 @@ impl Default for Options<NullImportResolver> {
                 "Default".to_string(),
             ],
             use_anyhow: false,
-            resolver: NullImportResolver,
+            resolver: Box::new(NullImportResolver{})
         }
     }
 }
@@ -91,10 +90,10 @@ pub fn rustfmt(input: &str) -> String {
     String::from_utf8_lossy(&proc.wait_with_output().unwrap().stdout).to_string()
 }
 
-pub fn compile_spec<T: ImportResolver + Clone + 'static>(
+pub fn compile_spec(
     name: &str,
     spec: &str,
-    options: &Options<T>,
+    options: &Options,
 ) -> AsgResult<()> {
     let resolver = PreludeImportResolver(options.resolver.clone());
     let program =
