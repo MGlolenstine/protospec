@@ -34,7 +34,7 @@ pub trait AsgExpression {
     fn get_type(&self) -> Option<Type>;
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone)]
 pub enum Expression {
     Binary(BinaryExpression),
     Unary(UnaryExpression),
@@ -61,23 +61,15 @@ impl AsgExpression for Expression {
             Cast(e) => e.get_type(),
             ArrayIndex(e) => e.get_type(),
             EnumAccess(e) => e.get_type(),
-            Int(e) => Some(Type::Scalar(e.type_)),
+            Int(e) => Some(Type::Scalar(EndianScalarType {
+                scalar: e.type_,
+                endian: Endian::Big,
+            })),
             ConstRef(e) => e.get_type(),
             InputRef(e) => e.get_type(),
             FieldRef(e) => e.get_type(),
             Str(e) => Some(Type::Array(Box::new(ArrayType {
-                element: Arc::new(Field {
-                    name: "$string".to_string(),
-                    arguments: RefCell::new(vec![]),
-                    span: e.span,
-                    type_: RefCell::new(Type::Scalar(ScalarType::U8)),
-                    condition: RefCell::new(None),
-                    transforms: RefCell::new(vec![]),
-                    toplevel: false,
-                    is_auto: Cell::new(false),
-                    is_maybe_cyclical: Cell::new(false),
-                    is_pad: Cell::new(false),
-                }),
+                element: Box::new(Type::Scalar(ScalarType::U8.into())),
                 length: LengthConstraint {
                     expandable: true,
                     value: Some(Expression::Int(self::Int {
@@ -91,6 +83,27 @@ impl AsgExpression for Expression {
             Bool(_) => Some(Type::Bool),
             Call(ffi) => ffi.get_type(),
             Member(e) => e.get_type(),
+        }
+    }
+}
+
+impl fmt::Debug for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Binary(arg0) => f.debug_tuple("Binary").field(arg0).finish(),
+            Self::Unary(arg0) => f.debug_tuple("Unary").field(arg0).finish(),
+            Self::Cast(arg0) => f.debug_tuple("Cast").field(arg0).finish(),
+            Self::ArrayIndex(arg0) => f.debug_tuple("ArrayIndex").field(arg0).finish(),
+            Self::EnumAccess(arg0) => f.debug_tuple("EnumAccess").field(arg0).finish(),
+            Self::Int(arg0) => f.debug_tuple("Int").field(arg0).finish(),
+            Self::ConstRef(arg0) => f.debug_tuple("ConstRef").field(arg0).finish(),
+            Self::InputRef(arg0) => f.debug_tuple("InputRef").field(arg0).finish(),
+            Self::FieldRef(arg0) => f.debug_tuple("FieldRef").field(&arg0.name).finish(),
+            Self::Str(arg0) => f.debug_tuple("Str").field(arg0).finish(),
+            Self::Ternary(arg0) => f.debug_tuple("Ternary").field(arg0).finish(),
+            Self::Bool(arg0) => f.debug_tuple("Bool").field(arg0).finish(),
+            Self::Call(arg0) => f.debug_tuple("Call").field(arg0).finish(),
+            Self::Member(arg0) => f.debug_tuple("Member").field(arg0).finish(),
         }
     }
 }

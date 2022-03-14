@@ -1,9 +1,11 @@
 mod compiler;
 mod parse;
 mod semantic;
+use std::collections::HashMap;
+
 use indexmap::IndexMap;
 use proc_macro2::TokenStream;
-use protospec_build::{*, ffi::ForeignType};
+use protospec_build::{ffi::ForeignType, *};
 use quote::quote;
 
 pub fn load_asg(content: &str) -> AsgResult<asg::Program> {
@@ -47,7 +49,7 @@ impl ForeignTransform for TestTransform {
     fn arguments(&self) -> Vec<FFIArgument> {
         vec![FFIArgument {
             name: "offset".to_string(),
-            type_: Some(asg::Type::Scalar(ScalarType::U8)),
+            type_: Some(asg::Type::Scalar(ScalarType::U8.into())),
             optional: true,
         }]
     }
@@ -95,14 +97,20 @@ impl ForeignTransform for TestTransform {
 impl ForeignType for TestType {
     fn assignable_from(&self, type_: &asg::Type) -> bool {
         match type_ {
-            asg::Type::Scalar(ScalarType::U32) => true,
+            asg::Type::Scalar(EndianScalarType {
+                scalar: ScalarType::U32,
+                ..
+            }) => true,
             _ => false,
         }
     }
 
     fn assignable_to(&self, type_: &asg::Type) -> bool {
         match type_ {
-            asg::Type::Scalar(ScalarType::U32) => true,
+            asg::Type::Scalar(EndianScalarType {
+                scalar: ScalarType::U32,
+                ..
+            }) => true,
             _ => false,
         }
     }
@@ -143,8 +151,8 @@ impl ForeignType for TestType {
         vec![]
     }
 
-    fn can_receive_auto(&self) -> Option<ScalarType> {
-        None
+    fn copyable(&self) -> bool {
+        false
     }
 }
 
@@ -176,6 +184,10 @@ impl ImportResolver for TestImportResolver {
     fn resolve_ffi_function(&self, name: &str) -> Result<Option<ForeignFunctionObj>> {
         Ok(None)
     }
+
+    fn prelude_ffi_functions(&self) -> Result<HashMap<String, ForeignFunctionObj>> {
+        Ok(Default::default())
+    }
 }
 
 pub struct MockImportResolver(IndexMap<String, String>);
@@ -203,7 +215,11 @@ impl ImportResolver for MockImportResolver {
         })
     }
 
-    fn resolve_ffi_function(&self, name: &str) -> Result<Option<ForeignFunctionObj>> {
+    fn resolve_ffi_function(&self, _name: &str) -> Result<Option<ForeignFunctionObj>> {
         Ok(None)
+    }
+
+    fn prelude_ffi_functions(&self) -> Result<HashMap<String, ForeignFunctionObj>> {
+        Ok(Default::default())
     }
 }

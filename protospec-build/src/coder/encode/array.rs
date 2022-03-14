@@ -1,7 +1,7 @@
 use super::*;
 
 impl Context {
-    pub fn encode_array(&mut self, type_: &ArrayType, target: Target, resolver: &Resolver, source: usize) {
+    pub fn encode_array(&mut self, type_: &ArrayType, target: Target, source: usize) {
         let terminator = if type_.length.expandable && type_.length.value.is_some() {
             let len = type_.length.value.as_ref().cloned().unwrap();
             let r = self.alloc_register();
@@ -11,36 +11,38 @@ impl Context {
             None
         };
 
-        let mut len = if terminator.is_none() {
-            if let Some(expr) = &type_.length.value {
-                self.check_auto(expr, source)
-            } else {
-                None
-            }
+        // let mut len = if terminator.is_none() {
+        //     if let Some(expr) = &type_.length.value {
+        //         let target = self.alloc_register();
+        //         self.instructions.push(Instruction::GetLen(
+        //             target,
+        //             source,
+        //             Some(ScalarType::U64),
+        //         ));
+        //         Some(target)
+        //     } else {
+        //         None
+        //     }
+        // } else {
+        //     None
+        // };
+
+        let len = if !type_.length.expandable {
+            let len = type_.length.value.as_ref().cloned().unwrap();
+            let r = self.alloc_register();
+            self.instructions.push(Instruction::Eval(r, len));
+            Some(r)
         } else {
             None
         };
 
-        if len.is_none() && !type_.length.expandable {
-            len = {
-                let len = type_.length.value.as_ref().cloned().unwrap();
-                let r = self.alloc_register();
-                self.instructions.push(Instruction::Eval(r, len));
-                Some(r)
-            };
-        }
-
-        if type_.element.condition.borrow().is_none()
-            && type_.element.transforms.borrow().len() == 0
-            && terminator.is_none()
-        {
-            let type_ = type_.element.type_.borrow();
-            let type_ = type_.resolved();
-            match &*type_ {
+        if terminator.is_none() {
+            let type_ = type_.element.resolved();
+            let primitive_type = match &*type_ {
                 // todo: const-length type optimizations for container/array/foreign
-                Type::Container(_) | Type::Array(_) | Type::Foreign(_) | Type::Ref(_) => (),
+                Type::Container(_) | Type::Array(_) | Type::Foreign(_) | Type::Ref(_) => None,
                 Type::Enum(e) => {
-                    self.instructions.push(Instruction::EncodePrimitiveArray(
+                    self.instructions.push(Instruction::EncodeReprArray(
                         target,
                         source,
                         PrimitiveType::Scalar(e.rep),
@@ -49,7 +51,7 @@ impl Context {
                     return;
                 },
                 Type::Bitfield(e) => {
-                    self.instructions.push(Instruction::EncodePrimitiveArray(
+                    self.instructions.push(Instruction::EncodeReprArray(
                         target,
                         source,
                         PrimitiveType::Scalar(e.rep),
@@ -57,54 +59,34 @@ impl Context {
                     ));
                     return;
                 },
-                Type::Scalar(x) => {
-                    self.instructions.push(Instruction::EncodePrimitiveArray(
-                        target,
-                        source,
-                        PrimitiveType::Scalar(*x),
-                        len,
-                    ));
-                    return;
-                }
-                Type::F32 => {
-                    self.instructions.push(Instruction::EncodePrimitiveArray(
-                        target,
-                        source,
-                        PrimitiveType::F32,
-                        len,
-                    ));
-                    return;
-                }
-                Type::F64 => {
-                    self.instructions.push(Instruction::EncodePrimitiveArray(
-                        target,
-                        source,
-                        PrimitiveType::F64,
-                        len,
-                    ));
-                    return;
-                }
-                Type::Bool => {
-                    self.instructions.push(Instruction::EncodePrimitiveArray(
-                        target,
-                        source,
-                        PrimitiveType::Bool,
-                        len,
-                    ));
-                    return;
-                }
+                Type::Scalar(s) => Some(PrimitiveType::Scalar(*s)),
+                Type::F32 => Some(PrimitiveType::F32),
+                Type::F64 => Some(PrimitiveType::F64),
+                Type::Bool => Some(PrimitiveType::Bool),
+            };
+            if let Some(primitive_type) = primitive_type {
+                self.instructions.push(Instruction::EncodePrimitiveArray(
+                    target,
+                    source,
+                    primitive_type,
+                    len,
+                ));
+                return;
             }
         }
 
         let current_pos = self.instructions.len();
         let iter_index = self.alloc_register();
         let new_source = self.alloc_register();
-        self.instructions.push(Instruction::GetField(
-            new_source,
-            source,
-            vec![FieldRef::ArrayAccess(iter_index)],
-        ));
-        self.encode_field(target, resolver, new_source, &type_.element);
+
+        let mut ops = vec![];
+        if !type_.element.copyable() {
+            ops.push(FieldRef::Ref);
+        }
+        ops.push(FieldRef::ArrayAccess(iter_index));
+        self.instructions
+            .push(Instruction::GetField(new_source, source, ops));
+        self.encode_type(&type_.element, target, new_source);
         let drained = self.instructions.drain(current_pos..).collect();
         let len = if let Some(len) = len {
             len
@@ -120,7 +102,7 @@ impl Context {
             self.instructions.push(Instruction::EncodePrimitiveArray(
                 target,
                 terminator,
-                PrimitiveType::Scalar(ScalarType::U8),
+                PrimitiveType::Scalar(ScalarType::U8.into()),
                 None,
             ));
         }
